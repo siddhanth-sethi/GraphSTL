@@ -149,6 +149,189 @@ namespace custom_stl {
 
         return {dist[endID], path};
     }
+
+    
+    // Kahn's Topological Sort — returns vector<T> in topological order
+    // Returns empty vector if graph has a cycle (not a DAG) , it is only meaningful for directed graphs.
+
+    template <typename T, typename Weight, bool IsDirected>
+    std::vector<T> kahn_topo_sort(const graph<T, Weight, IsDirected>& g) {
+        static_assert(IsDirected, "Kahn's topological sort requires a directed graph");
+
+        using NodeID = typename graph<T, Weight, IsDirected>::NodeID;
+
+        const auto& nodeMap = g.getData();
+        const auto& adj= g.getAdjList();
+
+        std::unordered_map<NodeID, size_t> inDegree;
+        for (const auto& kv : nodeMap) {
+            inDegree[kv.first] = 0;
+        }
+
+        for (const auto& kv : adj) {
+            for (const auto& edge : kv.second) {
+                inDegree[edge.targetNodeID]++;
+            }
+        }
+
+        std::queue<NodeID> q;
+        for (const auto& kv : inDegree) {
+            if (kv.second == 0) {
+                q.push(kv.first);
+            }
+        }
+
+        std::vector<T> result;
+        result.reserve(nodeMap.size());
+
+        while( !q.empty()) {
+            NodeID curr = q.front();
+            q.pop();
+            result.push_back(g.getNodeData(curr));
+
+            auto it = adj.find(curr);
+            if (it != adj.end()) {
+                for (const auto& edge : it->second) {
+                    inDegree[edge.targetNodeID]--;
+                    if (inDegree[edge.targetNodeID] == 0) {
+                        q.push(edge.targetNodeID);
+                    }
+                }
+            }
+        }
+
+        if (result.size() != nodeMap.size()) {
+            // Cycle Detected
+            return {}; 
+        }
+
+        return result;
+    }
+
+    // Bellman-Ford SSSP — returns {cost, path} , works with negative weights
+    // In case a negative cycle is reachable, it returns { numeric_limits::min(), {} }
+    // Complexity: O(V * E)
+    template <typename T, typename Weight, bool IsDirected>
+    std::pair<Weight, std::vector<T>> bellman_ford(const graph<T, Weight, IsDirected>& g,const T& srcData,const T& destData) {
+
+        using NodeID = typename graph<T, Weight, IsDirected>::NodeID;
+
+        NodeID startID = g.getNodeID(srcData);
+        NodeID endID = g.getNodeID(destData);
+        const auto& nodeMap = g.getData();
+        const auto& adj = g.getAdjList();
+
+        struct FlatEdge { 
+            NodeID u;
+            NodeID v;
+            Weight w; 
+        };
+
+        std::vector<FlatEdge> edges;
+
+        for (const auto& kv : adj) {
+            for (const auto& edge : kv.second) {
+                edges.push_back({kv.first, edge.targetNodeID, edge.weight});
+            }
+        }
+
+        std::unordered_map<NodeID, Weight> dist;
+        std::unordered_map<NodeID, NodeID> parent;
+
+        for (const auto& kv : nodeMap) {
+            dist[kv.first] = std::numeric_limits<Weight>::max();
+        }
+
+        dist[startID] = Weight{0};
+
+        size_t V = nodeMap.size();
+
+        for(size_t i = 0; i < V - 1; ++i) {
+            bool updated = false;
+
+            for (const auto& e : edges) {
+                if (dist[e.u] != std::numeric_limits<Weight>::max() && dist[e.u] + e.w < dist[e.v]) {
+                    dist[e.v] = dist[e.u] + e.w;
+                    parent[e.v] = e.u;
+                    updated = true;
+                }
+            }
+
+            if (!updated) {
+                break;
+              } 
+        }
+
+        // Negative cycle check
+        for(const auto& e: edges) {
+            if(dist[e.u] != std::numeric_limits<Weight>::max() && dist[e.u] + e.w < dist[e.v]) {
+                // Negative cycle detected
+                return {std::numeric_limits<Weight>::min(), {}};
+            }
+        }
+
+        std::vector<T> path;
+
+        if(dist[endID] == std::numeric_limits<Weight>::max()) {
+            return {dist[endID], path};
+        }
+
+        for(NodeID at = endID; at != startID; at = parent[at]) {
+            path.push_back(g.getNodeData(at));
+        }
+        
+        path.push_back(g.getNodeData(startID));
+        std::reverse(path.begin(), path.end());
+
+        return {dist[endID], path};
+    }
+
+    // Kruskal's MST — returns {total_weight, edge_list}
+    template <typename T, typename Weight, bool IsDirected>
+    std::pair<Weight, std::vector<std::pair<T, T>>> kruskal_mst(const graph<T, Weight, IsDirected>& g) {
+        using NodeID = typename graph<T, Weight, IsDirected>::NodeID;
+
+        const auto& adj = g.getAdjList();
+
+        std::vector<std::pair<T, T>> mst_edges;
+        Weight total_weight = Weight{0};
+
+        struct FlatEdge { 
+            NodeID u;
+            NodeID v;
+            Weight w; 
+        };
+
+        std::vector<FlatEdge> allEdges;
+
+        for (const auto& kv : adj){
+            NodeID u = kv.first;
+            for (const auto& edge : kv.second) {
+                if( IsDirected || u < edge.targetNodeID) {
+                    allEdges.push_back({u, edge.targetNodeID, edge.weight});
+                }
+            }
+        }
+
+        std::sort(allEdges.begin(), allEdges.end(),
+        [](const FlatEdge& a, const FlatEdge& b) { 
+            return a.w < b.w; 
+        }
+    );
+
+        DSU dsu(g.getNextID());
+
+        for (const auto& edge: allEdges) {
+            if (dsu.find(edge.u) != dsu.find(edge.v)) {
+                dsu.unite(edge.u, edge.v);
+                total_weight += edge.w;
+                mst_edges.push_back({g.getNodeData(edge.u), g.getNodeData(edge.v)});
+            }
+        }
+        return {total_weight, mst_edges};
+    }
+
+    
 }
 
 #endif
