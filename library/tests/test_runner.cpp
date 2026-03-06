@@ -341,6 +341,242 @@ void test_disconnected_graph() {
     assert(result.second.empty());
 }
 
+// Kahn's Topological Sort Tests
+
+void test_kahn_linear() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addNode('D');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('B', 'C', 1);
+    g.addEdge('C', 'D', 1);
+    // A->B->C->D
+    
+    auto order = kahn_topo_sort(g);
+
+    assert(order.size() == 4);
+    assert(order[0] == 'A');
+    assert(order[1] == 'B');
+    assert(order[2] == 'C');
+    assert(order[3] == 'D');
+}
+
+void test_kahn_diamond() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addNode('D');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('A', 'C', 1);
+    g.addEdge('B', 'D', 1);
+    g.addEdge('C', 'D', 1);
+
+    auto order = kahn_topo_sort(g);
+
+    assert(order.size() == 4);
+
+    assert(order[0] == 'A');
+    assert(order[3] == 'D');
+    // A must be first, D must be last
+    
+    bool bBeforeD = false;
+    bool cBeforeD = false;
+
+    for(size_t i = 0; i < order.size(); ++i) {
+        if (order[i] == 'B') {
+            bBeforeD = true;
+        }
+
+        if (order[i] == 'C') {
+            cBeforeD = true;
+        }
+
+        if (order[i] == 'D') {
+            assert(bBeforeD && cBeforeD);
+        }
+    }
+}
+
+void test_kahn_has_cycle_returns_empty() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('B', 'C', 1);
+    g.addEdge('C', 'A', 1);
+
+    auto order = kahn_topo_sort(g);
+
+    assert(order.empty());
+}
+
+void test_kahn_single_node() {
+    graph<char, int, true> g;
+    g.addNode('X');
+
+    auto order = kahn_topo_sort(g);
+
+    assert(order.size() == 1);
+    assert(order[0] == 'X');
+}
+
+void test_kahn_disconnected_dag() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addNode('D');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('C', 'D', 1);
+    // Separate chains - A->B and C->D
+
+    auto order = kahn_topo_sort(g);
+
+    assert(order.size() == 4);
+    // A must come before B, C must come before D
+    int posA = -1;
+    int posB = -1;
+    int posC = -1;
+    int posD = -1;
+
+    for(int i = 0; i < (int)order.size(); ++i) {
+        if (order[i] == 'A') {
+            posA = i;
+        }
+
+        if (order[i] == 'B') {
+            posB = i;
+        }
+
+        if (order[i] == 'C') {
+            posC = i;
+        }
+
+        if (order[i] == 'D') {
+            posD = i;
+        }
+    }
+    assert(posA < posB);
+    assert(posC < posD);
+}
+
+void test_kahn_with_cycle_detection() {
+    graph<char, int, true> dag;
+    dag.addNode('A');
+    dag.addNode('B');
+    dag.addEdge('A', 'B', 1);
+
+    assert(!dag.cyclePresent());
+    assert(!kahn_topo_sort(dag).empty());
+
+    graph<char, int, true> cyc;
+    cyc.addNode('X');
+    cyc.addNode('Y');
+    cyc.addEdge('X', 'Y', 1);
+    cyc.addEdge('Y', 'X', 1);
+
+    assert(cyc.cyclePresent());
+    assert(kahn_topo_sort(cyc).empty());
+}
+
+// Bellman-Ford Tests
+
+void test_bellman_ford() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addEdge('A', 'B', 10);
+    g.addEdge('A', 'C', 50);
+    g.addEdge('B', 'C', 10);
+
+    auto [cost, path] = bellman_ford(g, 'A', 'C');
+
+    assert(cost == 20);
+    assert(path.size() == 3);
+    assert(path[0] == 'A');
+    assert(path[1] == 'B');
+    assert(path[2] == 'C');
+}
+
+void test_bellman_ford_negative_weight() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addEdge('A', 'B', 5);
+    g.addEdge('B', 'C', -3);
+    g.addEdge('A', 'C', 4);
+    // A --5--> B --(-3)--> C
+    // A --4--> C  (direct but costs 4, whereas B costs 5+(-3)=2)
+
+    auto [cost, path] = bellman_ford(g, 'A', 'C');
+
+    assert(cost == 2);
+    assert(path.size() == 3);
+    assert(path[0] == 'A');
+    assert(path[1] == 'B');
+    assert(path[2] == 'C');
+}
+
+void test_bellman_ford_negative_cycle() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('B', 'C', -1);
+    g.addEdge('C', 'A', -1);
+    // A->B(1), B->C(-1), C->A(-1) → negative cycle
+    
+    auto [cost, path] = bellman_ford(g, 'A', 'C');
+
+    assert(cost == numeric_limits<int>::min());
+    assert(path.empty());
+}
+
+void test_bellman_ford_unreachable() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('Z');
+
+    auto [cost, path] = bellman_ford(g, 'A', 'Z');
+
+    assert(cost == numeric_limits<int>::max());
+    assert(path.empty());
+}
+
+void test_bellman_ford_single_node() {
+    graph<char, int, true> g;
+    g.addNode('A');
+
+    auto [cost, path] = bellman_ford(g, 'A', 'A');
+
+    assert(cost == 0);
+    assert(path.size() == 1);
+    assert(path[0] == 'A');
+}
+
+// Kruskal's MST Tests
+
+void test_kruskal_mst() {
+    graph<char, int, false> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('B', 'C', 2);
+    g.addEdge('A', 'C', 100);
+
+    auto result = kruskal_mst(g);
+
+    assert(result.first == 3);
+    assert(result.second.size() == 2);
+}
 
 
 int  main() {
@@ -389,6 +625,28 @@ int  main() {
     // Dijkstra Tests
     run_test("Dijkstra (Shortest Path)",test_dijkstra_shortest_path);
     run_test("Dijkstra (Disconnected)",test_disconnected_graph);
+    cout<<endl;
+
+    // Kahn's Topological Sort
+    run_test("Kahn (Linear Chain)",test_kahn_linear);
+    run_test("Kahn (Diamond DAG)",test_kahn_diamond);
+    run_test("Kahn (Cycle Returns Empty)",test_kahn_has_cycle_returns_empty);
+    run_test("Kahn (Single Node)",test_kahn_single_node);
+    run_test("Kahn (Disconnected DAG)",test_kahn_disconnected_dag);
+    run_test("Kahn + Cycle Present",test_kahn_with_cycle_detection);
+    cout<<endl;
+
+    // Bellman-Ford
+    run_test("Bellman-Ford ",test_bellman_ford);
+    run_test("Bellman-Ford (Negative Weight)",test_bellman_ford_negative_weight);
+    run_test("Bellman-Ford (Negative Cycle)",test_bellman_ford_negative_cycle);
+    run_test("Bellman-Ford (Unreachable)",test_bellman_ford_unreachable);
+    run_test("Bellman-Ford (Single Node)",test_bellman_ford_single_node);
+    cout<<endl;
+
+    // Kruskal's Mst Test
+    run_test("Kruskal's MST",test_kruskal_mst);
+    cout<<endl;
     
     cout << "__________ALL TESTS PASSED SUCCESSFULLY__________ " << endl;
 
