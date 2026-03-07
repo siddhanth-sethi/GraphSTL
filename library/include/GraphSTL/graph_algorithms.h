@@ -331,6 +331,146 @@ namespace custom_stl {
         return {total_weight, mst_edges};
     }
 
+    // Kosaraju's SCC ( Strongly Connected Components )
+    // Complexity: O(V + E)
+    template <typename T, typename Weight, bool IsDirected>
+    std::vector<std::vector<T>> kosaraju_scc(const graph<T, Weight, IsDirected>& g){
+
+        static_assert(IsDirected, "Kosaraju's SCC requires a directed graph");
+
+        using NodeID = typename graph<T, Weight, IsDirected>::NodeID;
+
+        const auto& nodeMap = g.getData();
+        const auto& adj = g.getAdjList();
+
+        std::unordered_set<NodeID> visited;
+        std::vector<NodeID> finishOrder;
+
+        finishOrder.reserve(nodeMap.size());
+
+        std::function<void(NodeID)> dfs1 = [&](NodeID u) {
+            visited.insert(u);
+            auto it = adj.find(u);
+
+            if (it != adj.end()) {
+                for (const auto& edge : it->second) {
+                    if (visited.find(edge.targetNodeID) == visited.end()) {
+                        dfs1(edge.targetNodeID);
+                    }
+                }
+            }
+            finishOrder.push_back(u);
+        };
+
+        for (const auto& kv : nodeMap) {
+            if (visited.find(kv.first) == visited.end()) {
+                dfs1(kv.first);
+            }
+        }
+
+        std::unordered_map<NodeID,std::vector<NodeID>> transposed;
+
+        for (const auto& kv : adj) {
+            for (const auto& edge : kv.second) {
+                transposed[edge.targetNodeID].push_back(kv.first);
+            }
+        }
+
+        visited.clear();
+        std::vector<std::vector<T>> result;
+
+        std::function<void(NodeID, std::vector<T>&)> dfs2 = [&](NodeID u, std::vector<T>& comp) {
+            visited.insert(u);
+            comp.push_back(g.getNodeData(u));
+            auto it = transposed.find(u);
+
+            if( it != transposed.end()) {
+                for( NodeID v : it->second ){
+                    if (visited.find(v) == visited.end()) {
+                        dfs2(v, comp);
+                    }
+                }
+            }
+        };
+
+        for (auto it = finishOrder.rbegin(); it != finishOrder.rend(); ++it) {
+            if (visited.find(*it) == visited.end()) {
+                std::vector<T> component;
+
+                dfs2(*it, component);
+                result.push_back(std::move(component));
+            }
+        }
+
+        return result;
+    }
+
+    // Tarjan's SCC — returns vector of Strongly Connected Components
+    template <typename T, typename Weight, bool IsDirected>
+    std::vector<std::vector<T>> tarjan_scc(const graph<T, Weight, IsDirected>& g) {
+        using NodeID = typename graph<T, Weight, IsDirected>::NodeID;
+
+        const auto& nodeMap = g.getData();
+        const auto& adj= g.getAdjList();
+
+        std::vector<std::vector<T>> result;
+        std::unordered_map<NodeID, int>  ids, low;
+        std::unordered_map<NodeID, bool> onStack;
+        std::stack<NodeID> st;
+
+        int idCounter = 0;
+
+        for (const auto& kv : nodeMap) {
+            ids[kv.first] = -1;
+            onStack[kv.first] = false;
+        }
+
+        std::function<void(NodeID)> strongConnect = [&](NodeID at) {
+            st.push(at);
+            onStack[at] = true;
+            ids[at] = low[at] = idCounter++;
+
+            auto it = adj.find(at);
+
+            if (it != adj.end()) {
+                for (const auto& edge : it->second) {
+                    NodeID to = edge.targetNodeID;
+                    if (ids[to] == -1) {
+                        strongConnect(to);
+                        low[at] = std::min(low[at], low[to]);
+                    }
+
+                    else if (onStack[to]) {
+                        low[at] = std::min(low[at], ids[to]);
+                    }
+                }
+            }
+
+            if (ids[at] == low[at]) {
+                std::vector<T> component;
+
+                while (true) {
+                    NodeID node = st.top();
+                    st.pop();
+
+                    onStack[node] = false;
+                    component.push_back(g.getNodeData(node));
+
+                    if (node == at) {
+                        break;
+                    }
+                }
+                result.push_back(component);
+            }
+        };
+
+        for (const auto& kv : nodeMap) {
+            if (ids[kv.first] == -1) {
+                strongConnect(kv.first);
+            }
+        }
+        return result;
+    }
     
 }
 
