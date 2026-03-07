@@ -578,6 +578,154 @@ void test_kruskal_mst() {
     assert(result.second.size() == 2);
 }
 
+// Kosaraju's SCC Tests
+
+void test_kosaraju_cycle() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addNode('D');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('B', 'C', 1);
+    g.addEdge('C', 'A', 1);
+    // A->B->C->A forms one SCC and D is isolated
+    
+    auto sccs = kosaraju_scc(g);
+    assert(sccs.size() == 2);
+
+    bool foundCycleGroup = false;
+    bool found = false;
+
+    for(const auto& comp: sccs) {
+        if(comp.size() == 3) {
+            foundCycleGroup = true;
+        }
+
+        if(comp.size() == 1) {
+            found = true;
+        }
+    }
+    assert(foundCycleGroup);
+    assert(found);
+}
+
+void test_kosaraju_all_separate() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    // No edges
+
+    auto sccs = kosaraju_scc(g);
+    assert(sccs.size() == 3);
+
+    for(const auto& comp: sccs){
+        assert(comp.size() == 1);
+    }
+}
+
+void test_kosaraju_two_sccs() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addNode('D');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('B', 'A', 1);
+    g.addEdge('C', 'D', 1);
+    g.addEdge('D', 'C', 1);
+    g.addEdge('B', 'C', 1);  // one-way bridge
+    // SCC1: A<->B,  SCC2: C<->D,  bridge: B->C 
+    
+    auto sccs = kosaraju_scc(g);
+    assert(sccs.size() == 2);
+
+    int sizeTwo = 0;
+
+    for(const auto& comp: sccs){
+        if (comp.size() == 2) {
+            sizeTwo++;
+        }
+    }
+    assert(sizeTwo == 2);
+}
+
+void test_kosaraju_single_node() {
+    graph<char, int, true> g;
+    g.addNode('X');
+
+    auto sccs =kosaraju_scc(g);
+
+    assert(sccs.size() == 1);
+    assert(sccs[0].size() == 1);
+    assert(sccs[0][0] == 'X');
+}
+
+
+// Tarjan's SCC Tests
+
+void test_tarjan_scc_cycles() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addNode('D');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('B', 'C', 1);
+    g.addEdge('C', 'A', 1);
+    
+    auto components = tarjan_scc(g);
+    assert(components.size() == 2);
+
+    bool foundCycleGroup = false;
+    
+    for(const auto& comp: components){
+        if(comp.size() == 3) {
+            foundCycleGroup = true;
+        }
+    }
+    
+    assert(foundCycleGroup);
+}
+
+// Testing for Kosaraju and Tarjan gives the same output
+
+void test_kosaraju_and_tarjan_gives_same_output() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addNode('D');
+    g.addNode('E');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('B', 'C', 1);
+    g.addEdge('C', 'A', 1);
+    g.addEdge('D', 'E', 1);
+    g.addEdge('E', 'D', 1);
+    
+    auto tarjan = tarjan_scc(g);
+    auto kosaraju = kosaraju_scc(g);
+    
+    assert(tarjan.size() == kosaraju.size());
+    
+    vector<size_t> tsizes;
+    vector<size_t> ksizes;
+    
+    for(auto& c: tarjan) {
+        tsizes.push_back(c.size());
+    }
+    
+    for(auto& c: kosaraju) {
+        ksizes.push_back(c.size());
+    }
+    
+    sort(tsizes.begin(), tsizes.end());        
+    sort(ksizes.begin(), ksizes.end());
+    
+    assert(tsizes == ksizes);
+    }
+
 
 int  main() {
 
@@ -637,7 +785,7 @@ int  main() {
     cout<<endl;
 
     // Bellman-Ford
-    run_test("Bellman-Ford ",test_bellman_ford);
+    run_test("Bellman-Ford",test_bellman_ford);
     run_test("Bellman-Ford (Negative Weight)",test_bellman_ford_negative_weight);
     run_test("Bellman-Ford (Negative Cycle)",test_bellman_ford_negative_cycle);
     run_test("Bellman-Ford (Unreachable)",test_bellman_ford_unreachable);
@@ -646,6 +794,21 @@ int  main() {
 
     // Kruskal's Mst Test
     run_test("Kruskal's MST",test_kruskal_mst);
+    cout<<endl;
+
+    // Kosaraju's SCC
+    run_test("Kosaraju (Basic Cycle)",test_kosaraju_cycle);
+    run_test("Kosaraju (All Separate)",test_kosaraju_all_separate);
+    run_test("Kosaraju (Two SCCs)",test_kosaraju_two_sccs);
+    run_test("Kosaraju (Single Node)",test_kosaraju_single_node);
+    cout<<endl;
+    
+    // Tarjan's SCC
+    run_test("Tarjan's SCC (Cycles)",test_tarjan_scc_cycles);
+    cout<<endl;
+
+    // Kosaraju and Tarjan gives the same output
+    run_test("Kosaraju and Tarjan gives the same Output",test_kosaraju_and_tarjan_gives_same_output);
     cout<<endl;
     
     cout << "__________ALL TESTS PASSED SUCCESSFULLY__________ " << endl;
