@@ -286,6 +286,196 @@ namespace custom_stl {
         return {dist[endID], path};
     }
 
+    // A* Search — returns {cost, path_vector}
+    template<typename T, typename Weight, bool IsDirected, typename Heuristic>
+    std::pair<double, std::vector<T>> a_star(const graph<T, Weight, IsDirected>& g,const T& srcData, const T& destData,Heuristic heuristic) {
+        using NodeID = typename graph <T, Weight, IsDirected>::NodeID;
+
+        NodeID startID = g.getNodeID(srcData);
+        NodeID endID = g.getNodeID(destData);
+
+        const auto& nodeMap = g.getData();
+        const auto& adj = g.getAdjList();
+
+        std::unordered_map<NodeID, double> gScore, fScore;
+        std::unordered_map<NodeID, NodeID> parent;
+
+        for(const auto& kv: nodeMap){
+            gScore[kv.first] = std::numeric_limits<double>::infinity();
+            fScore[kv.first] = std::numeric_limits<double>::infinity();
+        }
+
+        gScore[startID] = 0.0;
+        fScore[startID] = heuristic(g.getNodeData(startID), g.getNodeData(endID));
+
+        using PQ = std::pair<double, NodeID>;
+
+        std::priority_queue<PQ, std::vector<PQ>, std::greater<PQ>> open;
+
+        open.push({fScore[startID], startID});
+
+        while(!open.empty()) {
+            NodeID curr = open.top().second;
+            open.pop();
+
+            if(curr == endID) {
+                break;
+            }
+
+            auto it = adj.find(curr);
+
+            if(it != adj.end()){
+                for(const auto& edge : it->second) {
+
+                    double tentative = gScore[curr] + static_cast<double>(edge.weight);
+
+                    if (tentative < gScore[edge.targetNodeID]) {
+                        parent[edge.targetNodeID] = curr;
+
+                        gScore[edge.targetNodeID] = tentative;
+                        fScore[edge.targetNodeID] = tentative + heuristic(g.getNodeData(edge.targetNodeID), g.getNodeData(endID));
+
+                        open.push({fScore[edge.targetNodeID], edge.targetNodeID});
+                    }
+                }
+            }
+        }
+
+        std::vector<T>path;
+        
+        if( gScore[endID] == std::numeric_limits<double>::infinity()){
+            return {gScore[endID], path};
+        }
+
+        for(NodeID at = endID; at != startID; at = parent[at]) {
+            path.push_back(g.getNodeData(at));
+        }
+
+        path.push_back(g.getNodeData(startID));
+        std::reverse(path.begin(), path.end());
+
+        return {gScore[endID], path};
+    }
+
+    // Floyd-Warshall APSP - returns dist[src][dest] , next[src][dest] , path(src, dest)
+    // Complexity: O(V³)
+    template <typename T, typename Weight>
+    struct FWResult {
+        std::unordered_map<T, std::unordered_map<T, Weight>> dist; 
+        std::unordered_map<T, std::unordered_map<T, T>> next;
+
+        bool hasNegativeCycle = false;
+
+        std::vector<T> path(const T& src, const T& dest)const {
+            auto sit = dist.find(src);
+
+            if(sit == dist.end()) {
+                return {};
+            }
+
+            auto dit= sit->second.find(dest);
+
+            if(dit == sit->second.end()) {
+                return {};
+            }
+
+            if(dit->second == std::numeric_limits<Weight>::max()) {
+                return {};
+            }
+
+            std::vector<T> result;
+
+            T at = src;
+            result.push_back(at);
+
+            size_t limit = dist.size() + 1;
+
+            while(at != dest && limit-- > 0) {
+                at = next.at(at).at(dest);
+                result.push_back(at);
+            }
+
+            if (limit == 0) {
+                return {};  // negative cycle
+            }
+
+            return result;
+        }
+    };
+
+    template <typename T, typename Weight, bool IsDirected>
+    FWResult<T, Weight> floyd_warshall(const graph<T, Weight, IsDirected>& g){
+        using NodeID = typename graph<T, Weight, IsDirected>::NodeID;
+
+        const auto& nodeMap = g.getData();
+        const auto& adj= g.getAdjList();
+
+        std::vector<T> nodes;
+
+        nodes.reserve(nodeMap.size());
+
+        for(const auto& kv : nodeMap) {
+            nodes.push_back(kv.second);
+        }
+
+        FWResult<T, Weight> result;
+
+        auto& dist = result.dist;
+        auto& next = result.next;
+
+        // Distance matrix
+        const Weight INF = std::numeric_limits<Weight>::max();
+
+        for(const auto& u: nodes){
+            for(const auto& v: nodes) {
+                
+                if( u == v){
+                    dist[u][v] = Weight{0};
+                }
+                else{
+                    dist[u][v] = INF;
+                }
+            }
+            next[u][u] = u;
+        }
+
+        for(const auto& kv: adj) {
+            T srcVal = g.getNodeData(kv.first);
+
+            for(const auto& edge : kv.second){
+                T destVal = g.getNodeData(edge.targetNodeID);
+
+                if(edge.weight < dist[srcVal][destVal]) {
+                    dist[srcVal][destVal] = edge.weight;
+                    next[srcVal][destVal] = destVal;
+                }
+            }
+        }
+
+        // Triple Loop
+        for(const auto& k: nodes){
+            for(const auto& i: nodes){
+                for(const auto& j: nodes) {
+
+                    if(dist[i][k] != INF && dist[k][j] != INF && dist[i][k] + dist[k][j] < dist[i][j]) {
+                        dist[i][j] = dist[i][k] + dist[k][j];
+                        next[i][j] = next[i][k];
+                    }
+                }
+            }
+        }
+
+        for (const auto& u : nodes) {
+            if (dist[u][u] < Weight{0}) {
+                // Negative Cycle
+                result.hasNegativeCycle = true;
+                break;
+            }
+        }
+
+        return result;
+    }
+
     // Kruskal's MST — returns {total_weight, edge_list}
     template <typename T, typename Weight, bool IsDirected>
     std::pair<Weight, std::vector<std::pair<T, T>>> kruskal_mst(const graph<T, Weight, IsDirected>& g) {
