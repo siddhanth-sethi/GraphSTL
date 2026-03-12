@@ -561,6 +561,105 @@ void test_bellman_ford_single_node() {
     assert(path[0] == 'A');
 }
 
+// A* Search Tests
+
+void test_a_star_search() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addEdge('A', 'B', 10);
+
+    auto search = [](char, char) { 
+        return 0.0; 
+    };
+
+    auto result = a_star(g, 'A', 'B', search);
+
+    assert(result.first == 10.0);
+    assert(result.second.size() == 2);
+}
+
+// Floyd-Warshall Tests
+
+void test_floyd_warshall() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addEdge('A', 'B', 3);
+    g.addEdge('B', 'C', 4);
+    g.addEdge('A', 'C', 10);
+
+    auto fw = floyd_warshall(g);
+
+    assert(fw.dist['A']['B'] == 3);
+    assert(fw.dist['A']['C'] == 7);
+    assert(fw.dist['B']['C'] == 4);
+    assert(fw.dist['A']['A'] == 0);
+    assert(fw.dist['B']['B'] == 0);
+    assert(fw.dist['C']['C'] == 0);
+    assert(!fw.hasNegativeCycle);
+}
+
+void test_2_floyd_warshall() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addEdge('A', 'B', 1);
+    g.addEdge('B', 'C', 2);
+    g.addEdge('A', 'C', 100);
+
+    auto fw = floyd_warshall(g);
+    auto path = fw.path('A', 'C');
+
+    assert(path.size() == 3);
+    assert(path[0] == 'A');
+    assert(path[1] == 'B');
+    assert(path[2] == 'C');
+}
+
+void test_floyd_warshall_unreachable() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    // No edge
+
+    auto fw = floyd_warshall(g);
+    assert(fw.dist['A']['B'] == numeric_limits<int>::max());
+
+    auto path = fw.path('A', 'B');
+    assert(path.empty());
+}
+
+void test_floyd_warshall_negative_cycle() {
+    graph<char, int, true> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addEdge('A', 'B', -1);
+    g.addEdge('B', 'A', -1);
+
+    auto fw = floyd_warshall(g);
+
+    assert(fw.hasNegativeCycle);
+}
+
+void test_floyd_warshall_undirected() {
+    graph<char, int, false> g;
+    g.addNode('A');
+    g.addNode('B');
+    g.addNode('C');
+    g.addEdge('A', 'B', 2);
+    g.addEdge('B', 'C', 3);
+
+    auto fw = floyd_warshall(g);
+
+    assert(fw.dist['A']['B'] == 2);
+    assert(fw.dist['B']['A'] == 2);
+    assert(fw.dist['A']['C'] == 5);
+    assert(fw.dist['C']['A'] == 5);
+}
+
 // Kruskal's MST Tests
 
 void test_kruskal_mst() {
@@ -790,6 +889,18 @@ int  main() {
     run_test("Bellman-Ford (Negative Cycle)",test_bellman_ford_negative_cycle);
     run_test("Bellman-Ford (Unreachable)",test_bellman_ford_unreachable);
     run_test("Bellman-Ford (Single Node)",test_bellman_ford_single_node);
+    cout<<endl;
+
+    // A* Search 
+    run_test("A* Search", test_a_star_search);
+    cout<<endl;
+
+    // Floyd-Warshall
+    run_test("Floyd-Warshall",test_floyd_warshall);
+    run_test("Floyd-Warshall 2",test_2_floyd_warshall);
+    run_test("Floyd-Warshall (Unreachable)",test_floyd_warshall_unreachable);
+    run_test("Floyd-Warshall (Negative Cycle)",test_floyd_warshall_negative_cycle);
+    run_test("Floyd-Warshall (Undirected)",test_floyd_warshall_undirected);
     cout<<endl;
 
     // Kruskal's Mst Test
