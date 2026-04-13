@@ -150,6 +150,75 @@ namespace custom_stl {
         return {dist[endID], path};
     }
 
+    // Dijkstra Naive - TC: O(V^2) — used in benchmarks for comparison
+    template <typename T, typename Weight, bool IsDirected>
+    std::pair<Weight, std::vector<T>> dijkstra_naive(const graph<T, Weight, IsDirected>& g,const T& srcData,const T& destData) {
+        using NodeID = typename graph<T, Weight, IsDirected>::NodeID;
+
+        NodeID startID = g.getNodeID(srcData);
+        NodeID endID = g.getNodeID(destData);
+
+        const auto& nodeMap = g.getData();
+        const auto& adj = g.getAdjList();
+
+        std::unordered_map<NodeID, Weight> dist;
+        std::unordered_map<NodeID, NodeID> parent;
+        std::unordered_set<NodeID> visited;
+
+        for(const auto& kv: nodeMap){
+            dist[kv.first] = std::numeric_limits<Weight>::max();
+        }
+
+        dist[startID] = Weight{0};
+
+        for(size_t i = 0; i < nodeMap.size(); ++i) {
+            NodeID u = std::numeric_limits<NodeID>::max();
+            Weight best = std::numeric_limits<Weight>::max();
+
+            for(const auto& kv: dist){
+                if (visited.find(kv.first) == visited.end() && kv.second < best){
+                    best = kv.second;
+                    u = kv.first;
+                }
+            }
+
+            if(u == std::numeric_limits<NodeID>::max()) {
+                break;
+            }
+
+            if(u == endID) {
+                break;
+            }
+
+            visited.insert(u);
+            auto it = adj.find(u);
+
+            if( it != adj.end() ){
+                for(const auto& edge: it->second){
+                    Weight newDist = dist[u] +edge.weight;
+
+                    if(newDist < dist[edge.targetNodeID] ){
+                        dist[edge.targetNodeID] = newDist;
+                        parent[edge.targetNodeID] = u;
+                    }
+                }
+            }
+        }
+
+        std::vector<T> path;
+        if(dist[endID] == std::numeric_limits<Weight>::max() ){
+            return {dist[endID], path};
+        }
+
+        for(NodeID at = endID; at != startID; at = parent[at]){
+            path.push_back(g.getNodeData(at));
+        }
+
+        path.push_back(g.getNodeData(startID));
+        std::reverse(path.begin(), path.end());
+
+        return {dist[endID], path};
+    }
     
     // Kahn's Topological Sort — returns vector<T> in topological order
     // Returns empty vector if graph has a cycle (not a DAG) , it is only meaningful for directed graphs.
@@ -661,7 +730,6 @@ namespace custom_stl {
         }
         return result;
     }
-    
 }
 
 #endif
