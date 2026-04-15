@@ -48,7 +48,7 @@ if(GRAPHSTL_BUILD_BENCHMARKS)
 endif()
 
 if(GRAPHSTL_BUILD_EXAMPLES)
-    add_executable(graphstl_demo examples/demo.cpp)
+    add_executable(graphstl_demo example/demo.cpp)
     target_link_libraries(graphstl_demo PRIVATE graphstl)
     target_compile_options(graphstl_demo PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra>
