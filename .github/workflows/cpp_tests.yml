@@ -1,0 +1,63 @@
+name: C++ Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  # Classic g++ compilation
+  build-and-test-gcc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install g++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++
+
+      - name: Compile test suite
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Wpedantic -O2 \
+            library/tests/test_runner.cpp -o library/tests/test_runner
+
+      - name: Run tests
+        run: ./library/tests/test_runner
+
+      - name: Compile benchmarks (build-only check)
+        run: |
+          g++ -std=c++17 -Wall -Wextra -O2 \
+            library/benchmarks/benchmark_dijkstra.cpp -o library/benchmarks/benchmark_dijkstra
+
+  # CMake build (validates FetchContent compatibility)
+  build-and-test-cmake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++
+
+      - name: CMake configure
+        run: |
+          cd library
+          mkdir build && cd build
+          cmake .. -DGRAPHSTL_BUILD_TESTS=ON \
+                   -DGRAPHSTL_BUILD_BENCHMARKS=ON \
+                   -DGRAPHSTL_BUILD_EXAMPLES=ON
+
+      - name: CMake build
+        run: |
+          cd library/build
+          make -j$(nproc)
+
+      - name: Run CTest
+        run: |
+          cd library/build
+          ctest --output-on-failure
