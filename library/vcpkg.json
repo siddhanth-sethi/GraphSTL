@@ -1,0 +1,9 @@
+{
+    "name": "graphstl",
+    "version": "1.0.0",
+    "description": "A header-only C++17 graph library with STL-style iterators and 12 graph algorithms.",
+    "homepage": "https://github.com/siddhanth-sethi/GraphSTL",
+    "license": "MIT",
+    "supports": "!uwp",
+    "dependencies": []
+}
